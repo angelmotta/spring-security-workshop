@@ -5,20 +5,29 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
 
 public class RobotFilter extends OncePerRequestFilter {
+
+    private final String ROBOT_HEADER = "x-robot-password";
 
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
+        // 0. Should we execute the filter?
+        if (!Collections.list(request.getHeaderNames()).contains(ROBOT_HEADER)) {
+            // This kind of request it's not my business.
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         System.out.println("🤖 Hello from the Robot Filter");
         // 1. Authentication decision
         String password = request.getHeader("x-robot-password"); // be careful: password could be null
