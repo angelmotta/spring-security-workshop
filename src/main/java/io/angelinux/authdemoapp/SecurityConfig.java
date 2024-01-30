@@ -26,6 +26,7 @@ public class SecurityConfig {
         http.formLogin(Customizer.withDefaults());
         http.oauth2Login(Customizer.withDefaults());
         http.addFilterBefore(new RobotFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.authenticationProvider(new AngelAuthenticationProvider());
         return http.build();
     }
 
