@@ -24,10 +24,11 @@ import java.util.Optional;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationEventPublisher publisher) throws Exception {
-        // Create a ProviderManager (the implementation of AuthenticationManager Interface)
-        ProviderManager authManager = new ProviderManager(new RobotAuthenticationProvider(List.of("beep-boop", "boop-beep")));
-        authManager.setAuthenticationEventPublisher(publisher);
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // Set configurer
+        var configurer = new RobotLoginConfigurer()
+                .password("beep-boop")
+                .password("boop-beep");
 
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/").permitAll()
@@ -36,8 +37,9 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
         );
         http.formLogin(Customizer.withDefaults());
+        http.httpBasic(Customizer.withDefaults());
         http.oauth2Login(Customizer.withDefaults());
-        http.addFilterBefore(new RobotFilter(authManager), UsernamePasswordAuthenticationFilter.class);
+        http.with(configurer, Customizer.withDefaults());
         http.authenticationProvider(new AngelAuthenticationProvider());
         return http.build();
     }
