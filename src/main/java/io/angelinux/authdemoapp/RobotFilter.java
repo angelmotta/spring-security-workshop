@@ -5,6 +5,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -15,6 +18,11 @@ import java.util.Collections;
 public class RobotFilter extends OncePerRequestFilter {
 
     private final String ROBOT_HEADER = "x-robot-password";
+    private final AuthenticationManager authenticationManager;
+
+    public RobotFilter(AuthenticationManager authenticationManager) {
+        this.authenticationManager = authenticationManager;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -30,20 +38,23 @@ public class RobotFilter extends OncePerRequestFilter {
 
         System.out.println("🤖 Hello from the Robot Filter");
         // 1. Authentication decision
-        String password = request.getHeader("x-robot-password"); // be careful: password could be null
-        if (!"beep-boop".equals(password)) {
+        String password = request.getHeader(ROBOT_HEADER); // be careful: password could be null
+        RobotAuthentication authRequest = RobotAuthentication.unauthenticated(password);
+
+        try {
+            Authentication authentication = authenticationManager.authenticate(authRequest); // if this verification fails -> throws an Exception
+            // OK Legit Access 👍🏻: create `Authentication` and set in SecurityContext
+            // 2. Do the rest (continue)
+            SecurityContext newContext = SecurityContextHolder.createEmptyContext();
+            newContext.setAuthentication(authentication);
+            SecurityContextHolder.setContext(newContext);
+            filterChain.doFilter(request, response);
+        } catch (AuthenticationException e) {
             // NO 👎🏻 Deny access
             response.setStatus(HttpStatus.FORBIDDEN.value());
             response.setCharacterEncoding("utf-8");
             response.setHeader("Content-type", "text/plain;charset=utf-8");
-            response.getWriter().println("You are not Ms Robot 🤖❌");
-            return;
+            response.getWriter().println(e.getMessage());
         }
-        // 2. Do the rest (continue)
-        // OK 👍🏻: create `Authentication` and set in SecurityContext
-        SecurityContext newContext = SecurityContextHolder.createEmptyContext();
-        newContext.setAuthentication(new RobotAuthentication());
-        SecurityContextHolder.setContext(newContext);
-        filterChain.doFilter(request, response);
     }
 }

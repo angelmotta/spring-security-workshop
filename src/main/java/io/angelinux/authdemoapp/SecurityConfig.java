@@ -3,6 +3,8 @@ package io.angelinux.authdemoapp;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationEventPublisher;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,6 +16,7 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.List;
 import java.util.Optional;
 
 @Configuration
@@ -21,7 +24,11 @@ import java.util.Optional;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationEventPublisher publisher) throws Exception {
+        // Create a ProviderManager (the implementation of AuthenticationManager Interface)
+        ProviderManager authManager = new ProviderManager(new RobotAuthenticationProvider(List.of("beep-boop", "boop-beep")));
+        authManager.setAuthenticationEventPublisher(publisher);
+
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/").permitAll()
                 .requestMatchers("/error").permitAll()
@@ -30,7 +37,7 @@ public class SecurityConfig {
         );
         http.formLogin(Customizer.withDefaults());
         http.oauth2Login(Customizer.withDefaults());
-        http.addFilterBefore(new RobotFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new RobotFilter(authManager), UsernamePasswordAuthenticationFilter.class);
         http.authenticationProvider(new AngelAuthenticationProvider());
         return http.build();
     }
@@ -46,6 +53,7 @@ public class SecurityConfig {
         );
     }
 
+    // ProviderManager produces an event when a user log in. So Here is the listener to those events
     @Bean
     public ApplicationListener<AuthenticationSuccessEvent> successListener() {
         return event -> {
