@@ -4,13 +4,16 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationEventPublisher;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
@@ -38,7 +41,18 @@ public class SecurityConfig {
         );
         http.formLogin(Customizer.withDefaults());
         http.httpBasic(Customizer.withDefaults());
-        http.oauth2Login(Customizer.withDefaults());
+        http.oauth2Login(
+                oauth2Configurer -> {
+                    oauth2Configurer.withObjectPostProcessor(
+                            new ObjectPostProcessor<AuthenticationProvider>() {
+                                @Override
+                                public <O extends AuthenticationProvider> O postProcess(O object) {
+                                    return (O) new RateLimitedAuthenticationProvider(object);
+                                }
+                            }
+                    );
+                }
+        );
         http.with(configurer, Customizer.withDefaults());
         http.authenticationProvider(new AngelAuthenticationProvider());
         return http.build();
