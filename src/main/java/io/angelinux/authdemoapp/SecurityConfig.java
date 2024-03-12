@@ -11,14 +11,25 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,24 +46,30 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/").permitAll()
+//                .requestMatchers("/signup").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/favicon.ico").permitAll()
                 .anyRequest().authenticated()
         );
+        http.cors((cors) -> cors
+                .configurationSource(corsConfigurationSource()));
+        http.csrf(AbstractHttpConfigurer::disable);
         http.formLogin(Customizer.withDefaults());
         http.httpBasic(Customizer.withDefaults());
-        http.oauth2Login(
-                oauth2Configurer -> {
-                    oauth2Configurer.withObjectPostProcessor(
-                            new ObjectPostProcessor<AuthenticationProvider>() {
-                                @Override
-                                public <O extends AuthenticationProvider> O postProcess(O object) {
-                                    return (O) new RateLimitedAuthenticationProvider(object);
-                                }
-                            }
-                    );
-                }
-        );
+//        http.oauth2Login(
+//                oauth2Configurer -> {
+//                    oauth2Configurer.withObjectPostProcessor(
+//                            new ObjectPostProcessor<AuthenticationProvider>() {
+//                                @Override
+//                                public <O extends AuthenticationProvider> O postProcess(O object) {
+//                                    return (O) new RateLimitedAuthenticationProvider(object);
+//                                }
+//                            }
+//                    );
+//                }
+//        );
+        http.oauth2Login(Customizer.withDefaults());
+        http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())));
         http.with(configurer, Customizer.withDefaults());
         http.authenticationProvider(new AngelAuthenticationProvider());
         return http.build();
@@ -95,5 +112,31 @@ public class SecurityConfig {
                     String.format("🎉 SUCCESS AUTHENTICATION [%s] %s ", typeAuthentication, username)
             );
         };
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("http://localhost:1234"));
+        configuration.setAllowedMethods(Arrays.asList("GET","POST","PATCH", "PUT", "DELETE", "OPTIONS", "HEAD"));
+        configuration.setAllowCredentials(true);
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Requestor-Type", "Content-Type"));
+        configuration.setExposedHeaders(Arrays.asList("X-Get-Header"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+//    @Bean
+//    public JwtDecoderFactory<ClientRegistration> idTokenDecoderFactory() {
+//        OidcIdTokenDecoderFactory idTokenDecoderFactory = new OidcIdTokenDecoderFactory();
+//        idTokenDecoderFactory.setJwsAlgorithmResolver(clientRegistration -> MacAlgorithm.HS256);
+//        return idTokenDecoderFactory;
+//    }
+
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        // Configure NimbusJwtDecoder with Google's JWK set URI
+        return NimbusJwtDecoder.withJwkSetUri("https://www.googleapis.com/oauth2/v3/certs").build();
     }
 }
